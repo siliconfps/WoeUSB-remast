@@ -93,4 +93,4 @@ the debian system requires python policy for modifications with the system, but 
 
 
 ## License
-WoeUSB-ng is distributed under the [GPL license](https://github.com/WoeUSB/WoeUSB-ng/blob/master/COPYING).
+WoeUSB-remast is distributed under the [GPL license](https://github.com/WoeUSB/WoeUSB-ng/blob/master/COPYING).
