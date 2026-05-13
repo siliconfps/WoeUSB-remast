@@ -1,5 +1,5 @@
 <div align="center">
-<h1>WoeUSB-ng</h1>
+<h1>WoeUSB-remast</h1>
 <img src=".github/woeusb-logo.png" alt="brand" width="28%" />
 </div>
 
@@ -88,6 +88,9 @@ sudo rm /usr/share/icons/WoeUSB-ng/icon.ico \
     /usr/local/bin/woeusbgui
 sudo rmdir /usr/share/icons/WoeUSB-ng/
 ```
+### Debian note
+the debian system requires python policy for modifications with the system, but it can broke you programs
+
 
 ## License
 WoeUSB-ng is distributed under the [GPL license](https://github.com/WoeUSB/WoeUSB-ng/blob/master/COPYING).
