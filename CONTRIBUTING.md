@@ -36,7 +36,7 @@ There are so many aspects of the code that can be improved, however, please cons
 It is required to mimic the coding style of the current code
 
 #### Indentation
-This project uses tab characters for indentation as it's width can be flexibly configured in many text editors
+This project uses 4 spaces for indentation in Python code.
 
 #### Padding Spaces
 * Padding is required for operators
@@ -52,7 +52,7 @@ NOTE: This currently only applies to the GNU Bash shell scripts.
 We use UTF-8 encoding for all of our files
 
 ## Promote This Project to Others
-It is appreciated if you share this project with others.  Also, if you write an article about this project, plese share it with us, we'd love to hear about it!
+It is appreciated if you share this project with others.  Also, if you write an article about this project, please share it with us, we'd love to hear about it!
 
 ## Design Artwork/Logos for This Software
 All current artwork is stored under src/data.  Please only use materials that are under a free license.

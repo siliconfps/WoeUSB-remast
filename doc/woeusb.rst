@@ -7,6 +7,6 @@ WoeUSB
    utils.rst
    workaround.rst
 
-.. automodule:: woeusb
+.. automodule:: WoeUSB.core
 	:members:
 	:undoc-members:

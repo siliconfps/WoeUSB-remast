@@ -10,6 +10,11 @@ import WoeUSB.miscellaneous as miscellaneous
 
 _ = miscellaneous.i18n
 
+
+class WoeUSBError(Exception):
+    pass
+
+
 #: Disable message coloring when set to True, set by --no-color
 no_color = False
 
@@ -74,6 +79,15 @@ def check_runtime_dependencies(application_name):
         return [fat, ntfs, grub]
 
 
+def _is_partition(path):
+    return bool(re.match(r'/dev/(?:nvme\d+n\d+p\d+|[a-z]+\d+)$', path))
+
+
+def _get_parent_device(partition_path):
+    m = re.match(r'(/dev/(?:nvme\d+n\d+|[a-z]+))', partition_path)
+    return m.group(1) if m else partition_path
+
+
 def check_runtime_parameters(install_mode, source_media, target_media):
     """
     :param install_mode:
@@ -92,11 +106,11 @@ def check_runtime_parameters(install_mode, source_media, target_media):
         print_with_color(_("Error: Target media \"{0}\" is not a block device file!").format(target_media), "red")
         return 1
 
-    if install_mode == "device" and target_media[-1].isdigit():
+    if install_mode == "device" and _is_partition(target_media):
         print_with_color(_("Error: Target media \"{0}\" is not an entire storage device!").format(target_media), "red")
         return 1
 
-    if install_mode == "partition" and not target_media[-1].isdigit():
+    if install_mode == "partition" and not _is_partition(target_media):
         print_with_color(_("Error: Target media \"{0}\" is not an partition!").format(target_media), "red")
         return 1
     return 0
@@ -110,10 +124,7 @@ def determine_target_parameters(install_mode, target_media):
     """
     if install_mode == "partition":
         target_partition = target_media
-
-        while target_media[-1].isdigit():
-            target_media = target_media[:-1]
-        target_device = target_media
+        target_device = _get_parent_device(target_media)
     else:
         target_device = target_media
         target_partition = target_media + str(1)
@@ -130,9 +141,9 @@ def check_is_target_device_busy(device):
     :param device:
     :return:
     """
-    mount = subprocess.run("mount", stdout=subprocess.PIPE).stdout.decode("utf-8").strip()
+    mount = subprocess.run(["mount"], stdout=subprocess.PIPE).stdout.decode("utf-8").strip()
     if re.findall(device, mount) != []:
-        mounts = re.findall(rf'{device}\S*', mount)
+        mounts = re.findall(rf'{re.escape(device)}\S*', mount)
         print_with_color(_("Warning: The following partitions will be unmounted: {0}").format(mounts), "yellow")
         for partition in mounts:
             if subprocess.run(["umount", partition]).returncode:
@@ -177,7 +188,7 @@ def check_fat32_filesize_limitation(source_fs_mountpoint):
             if os.path.getsize(path) > (2 ** 32) - 1:  # Max fat32 file size
                 print_with_color(
                     _(
-                        "Warning: File {0} in source image has exceed the FAT32 Filesystem 4GiB Single File Size Limitation, swiching to NTFS filesystem.").format(
+                        "Warning: File {0} in source image has exceeded the FAT32 Filesystem 4GiB Single File Size Limitation, switching to NTFS filesystem.").format(
                         path),
                     "yellow")
                 print_with_color(
@@ -225,7 +236,7 @@ def check_uefi_ntfs_support_partition(target_device):
                             "--noheadings",
                             target_device], stdout=subprocess.PIPE).stdout.decode("utf-8").strip()
 
-    if re.findall("UEFI_NTFS", lsblk) != []:
+    if re.findall("UEFI_NTFS", lsblk) == []:
         print_with_color(
             _("Warning: Your device doesn't seems to have an UEFI:NTFS partition, "
               "UEFI booting will fail if the motherboard firmware itself doesn't support NTFS filesystem!"))
@@ -287,7 +298,7 @@ def print_with_color(text, color=""):
         gui.state = text
         if color == "red":
             gui.error = text
-            sys.exit()
+            raise WoeUSBError(text)
     else:
         if no_color or color == "":
             sys.stdout.write(text + "\n")
@@ -307,8 +318,8 @@ def get_size(path):
     total_size = 0
     for dirpath, __, filenames in os.walk(path):
         for file in filenames:
-            path = os.path.join(dirpath, file)
-            total_size += os.path.getsize(path)
+            filepath = os.path.join(dirpath, file)
+            total_size += os.path.getsize(filepath)
     return total_size
 
 
@@ -323,7 +334,7 @@ def check_kill_signal():
     """
     if gui is not None:
         if gui.kill:
-            raise sys.exit()
+            sys.exit()
 
 
 # noinspection DuplicatedCode
@@ -335,17 +346,19 @@ def update_policy_to_allow_for_running_gui_as_root(path):
         "DOC: https://www.freedesktop.org/software/polkit/docs/latest/polkit.8.html\n"
         "--><policyconfig>\n"
         "	<vendor>The WoeUSB Project</vendor>\n"
-        "	<vendor_url>https://github.com/slacka/WoeUSB</vendor_url>\n"
+        "	<vendor_url>https://github.com/WoeUSB/WoeUSB-ng</vendor_url>\n"
         "	<icon_name>woeusbgui-icon</icon_name>\n"
         "\n"
-        "	<action id=\"com.github.slacka.woeusb.run-gui-using-pkexec\">\n"
+        "	<action id=\"com.github.woeusb.woeusb-ng.run-gui-using-pkexec\">\n"
         "		<description>Run `woeusb` as SuperUser</description>\n"
         "		<description xml:lang=\"zh_TW\">以超級使用者(SuperUser)身份執行 `woeusb`</description>\n"
         "		<description xml:lang=\"pl_PL\">Uruchom `woeusb` jako root</description>\n"
+        "		<description xml:lang=\"pt_BR\">Execute `woeusb` como root</description>\n"
         "		\n"
         "		<message>Authentication is required to run `woeusb` as SuperUser.</message>\n"
         "		<message xml:lang=\"zh_TW\">以超級使用者(SuperUser)身份執行 `woeusb` 需要通過身份驗證。</message>\n"
         "		<message xml:lang=\"pl_PL\">Wymagana jest autoryzacja do uruchomienia `woeusb` jako root</message>\n"
+        "		<message xml:lang=\"pt_BR\">A autenticação é necessária para executar `woeusb` como root.</message>\n"
         "		\n"
         "		<defaults>\n"
         "			<allow_any>auth_admin</allow_any>\n"
@@ -353,34 +366,20 @@ def update_policy_to_allow_for_running_gui_as_root(path):
         "			<allow_active>auth_admin_keep</allow_active>\n"
         "		</defaults>\n"
         "		\n"
-        "		<annotate key=\"org.freedesktop.policykit.exec.path\">/usr/local/bin/woeusbgui</annotate>\n"
-        "   		<annotate key=\"org.freedesktop.policykit.exec.allow_gui\">true</annotate>\n"
-        "	</action>\n"
-        "	<action id=\"com.github.slacka.woeusb.run-gui-using-pkexec-local\">\n"
-        "		<description>Run `woeusb` as SuperUser</description>\n"
-        "		<description xml:lang=\"zh_TW\">以超級使用者(SuperUser)身份執行 `woeusb`</description>\n"
-        "		<description xml:lang=\"pl_PL\">Uruchom `woeusb` jako root</description>\n"
-        "\n"
-        "		<message>Authentication is required to run `woeusb` as SuperUser.</message>\n"
-        "		<message xml:lang=\"zh_TW\">以超級使用者(SuperUser)身份執行 `woeusb` 需要通過身份驗證。</message>\n"
-        "		<message xml:lang=\"pl_PL\">Wymagana jest autoryzacja do uruchomienia `woeusb` jako root</message>\n"
-        "\n"
-        "		<defaults>\n"
-        "			<allow_any>auth_admin</allow_any>\n"
-        "			<allow_inactive>auth_admin</allow_inactive>\n"
-        "			<allow_active>auth_admin_keep</allow_active>\n"
-        "		</defaults>\n"
-        "\n"
         "		<annotate key=\"org.freedesktop.policykit.exec.path\">/usr/local/bin/woeusbgui</annotate>\n"
         "   		<annotate key=\"org.freedesktop.policykit.exec.allow_gui\">true</annotate>\n"
         "	</action>\n"
         "</policyconfig>"
     )
     for action in dom.getElementsByTagName('action'):
-        if action.getAttribute('id') == "com.github.slacka.woeusb.run-gui-using-pkexec":
+        if action.getAttribute('id') == "com.github.woeusb.woeusb-ng.run-gui-using-pkexec":
             for annotate in action.getElementsByTagName('annotate'):
                 if annotate.getAttribute('key') == "org.freedesktop.policykit.exec.path":
                     annotate.childNodes[0].nodeValue = path
 
-    with open("/usr/share/polkit-1/actions/com.github.woeusb.woeusb-ng.policy", "w") as file:
-        file.write(dom.toxml())
+    try:
+        with open("/usr/share/polkit-1/actions/com.github.woeusb.woeusb-ng.policy", "w") as file:
+            file.write(dom.toxml())
+    except PermissionError:
+        print_with_color(_("Error: Permission denied when writing policy file"), "red")
+        return 1

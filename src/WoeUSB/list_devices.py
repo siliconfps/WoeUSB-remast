@@ -16,7 +16,7 @@ def usb_drive(show_all=False):
     devices = re.sub("sr[0-9]|cdrom[0-9]", "", lsblk).split()
 
     for device in devices:
-        if is_removable_and_writable_device(device):
+        if not is_removable_and_writable_device(device):
             if not show_all:
                 continue
 
@@ -45,21 +45,22 @@ def usb_drive(show_all=False):
 
 def is_removable_and_writable_device(block_device_name):
     sysfs_block_device_dir = "/sys/block/" + block_device_name
+    removable_path = sysfs_block_device_dir + "/removable"
+    ro_path = sysfs_block_device_dir + "/ro"
 
-    # We consider device not removable if the removable sysfs item not exist
-    if os.path.isfile(sysfs_block_device_dir + "/removable"):
-        with open(sysfs_block_device_dir + "/removable") as removable:
+    if os.path.isfile(removable_path) and os.path.isfile(ro_path):
+        with open(removable_path) as removable:
             removable_content = removable.read()
 
-        with open(sysfs_block_device_dir + "/ro") as ro:
+        with open(ro_path) as ro:
             ro_content = ro.read()
 
         if removable_content.strip("\n") == "1" and ro_content.strip("\n") == "0":
-            return 0
+            return True
         else:
-            return 1
+            return False
     else:
-        return 1
+        return False
 
 
 def dvd_drive():

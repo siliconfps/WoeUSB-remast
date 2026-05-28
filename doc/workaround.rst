@@ -1,5 +1,5 @@
 workaround.py
 **************************
-..	automodule:: workaround
+.. automodule:: WoeUSB.workaround
 	:members:
 	:undoc-members:

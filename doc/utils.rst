@@ -1,6 +1,6 @@
 utils.py
 **************************
 
-..	automodule:: utils
+.. automodule:: WoeUSB.utils
 	:members:
 	:undoc-members:

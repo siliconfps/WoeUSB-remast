@@ -22,7 +22,7 @@ application_name = 'WoeUSB'
 application_version = miscellaneous.__version__
 DEFAULT_NEW_FS_LABEL = 'Windows USB'
 
-application_site_url = 'https://github.com/slacka/WoeUSB'
+application_site_url = 'https://github.com/WoeUSB/WoeUSB-ng'
 application_copyright_declaration = "Copyright © Colin GILLE / congelli501 2013\\nCopyright © slacka et.al. 2017"
 application_copyright_notice = application_name + " is free software licensed under the GNU General Public License version 3(or any later version of your preference) that gives you THE 4 ESSENTIAL FREEDOMS\\nhttps://www.gnu.org/philosophy/"
 
@@ -52,10 +52,10 @@ def init(from_cli=True, install_mode=None, source_media=None, target_media=None,
     :param filesystem_label:
     :return: List
     """
-    source_fs_mountpoint = "/media/woeusb_source_" + str(
-        round((datetime.today() - datetime.fromtimestamp(0)).total_seconds())) + "_" + str(os.getpid())
-    target_fs_mountpoint = "/media/woeusb_target_" + str(
-        round((datetime.today() - datetime.fromtimestamp(0)).total_seconds())) + "_" + str(os.getpid())
+    timestamp = str(round((datetime.today() - datetime.fromtimestamp(0)).total_seconds()))
+    pid = str(os.getpid())
+    source_fs_mountpoint = "/media/woeusb_source_" + timestamp + "_" + pid
+    target_fs_mountpoint = "/media/woeusb_target_" + timestamp + "_" + pid
 
     temp_directory = tempfile.mkdtemp(prefix="WoeUSB.")
 
@@ -66,6 +66,8 @@ def init(from_cli=True, install_mode=None, source_media=None, target_media=None,
     debug = False
 
     parser = None
+
+    skip_legacy_bootloader = False
 
     if from_cli:
         parser = setup_arguments()
@@ -83,13 +85,11 @@ def init(from_cli=True, install_mode=None, source_media=None, target_media=None,
             utils.print_with_color(_("You need to specify installation type (--device or --partition)"))
             return 1
 
-        #: source_media may be a optical disk drive or a disk image
         source_media = args.source
-        #: target_media may be an entire usb storage device or just a partition
         target_media = args.target
 
         workaround_bios_boot_flag = args.workaround_bios_boot_flag
-        
+
         skip_legacy_bootloader = args.workaround_skip_grub
 
         target_filesystem_type = args.target_filesystem
@@ -125,13 +125,9 @@ def main(source_fs_mountpoint, target_fs_mountpoint, source_media, target_media,
     :param temp_directory:
     :param target_filesystem_type:
     :param workaround_bios_boot_flag:
-    :return: 0 - succes; 1 - failure
+    :return: 0 - success; 1 - failure
     """
-    global debug
-    global verbose
-    global no_color
     global current_state
-    global target_device
 
     current_state = 'enter-init'
 
@@ -149,7 +145,8 @@ def main(source_fs_mountpoint, target_fs_mountpoint, source_media, target_media,
         utils.print_with_color(_("Warning: This might be the reason of the following failure."), "yellow")
 
     if utils.check_runtime_parameters(install_mode, source_media, target_media):
-        parser.print_help()
+        if parser is not None:
+            parser.print_help()
         return 1
 
     target_device, target_partition = utils.determine_target_parameters(install_mode, target_media)
@@ -168,8 +165,10 @@ def main(source_fs_mountpoint, target_fs_mountpoint, source_media, target_media,
             target_filesystem_type = "NTFS"
 
     if install_mode == "device":
-        wipe_existing_partition_table_and_filesystem_signatures(target_device)
-        create_target_partition_table(target_device, "legacy")
+        if wipe_existing_partition_table_and_filesystem_signatures(target_device) != 0:
+            return 1
+        if create_target_partition_table(target_device, "legacy") != 0:
+            return 1
         create_target_partition(target_device, target_partition, target_filesystem_type, target_filesystem_type,
                                 command_mkdosfs,
                                 command_mkntfs)
@@ -179,7 +178,6 @@ def main(source_fs_mountpoint, target_fs_mountpoint, source_media, target_media,
             install_uefi_ntfs_support_partition(target_device + "2", temp_directory)
 
     if install_mode == "partition":
-        utils.check_target_partition(target_partition, target_device)
         utils.check_target_partition(target_partition, target_device)
 
     if mount_target_filesystem(target_partition, target_fs_mountpoint):
@@ -217,11 +215,15 @@ def print_application_info():
 def wipe_existing_partition_table_and_filesystem_signatures(target_device):
     """
     :param target_device:
-    :return: None
+    :return: 0 - success; 1 - failure
     """
     utils.print_with_color(_("Wiping all existing partition table and filesystem signatures in {0}").format(target_device), "green")
-    subprocess.run(["wipefs", "--all", target_device])
-    check_if_the_drive_is_really_wiped(target_device)
+    result = subprocess.run(["wipefs", "--all", target_device])
+    if result.returncode != 0:
+        utils.print_with_color(_("Error: Failed to wipe device {0}").format(target_device), "red")
+        return 1
+    if check_if_the_drive_is_really_wiped(target_device) != 0:
+        return 1
 
 
 def check_if_the_drive_is_really_wiped(target_device):
@@ -372,13 +374,11 @@ def install_uefi_ntfs_support_partition(uefi_ntfs_partition, download_directory)
     utils.check_kill_signal()
 
     try:
-        fileName = urllib.request.urlretrieve("https://github.com/pbatard/rufus/raw/master/res/uefi/uefi-ntfs.img", "uefi-ntfs.img")[0] #[local_filename, headers]
+        fileName = urllib.request.urlretrieve("https://github.com/pbatard/rufus/raw/master/res/uefi/uefi-ntfs.img", download_directory + "/uefi-ntfs.img")[0]
     except (urllib.error.ContentTooShortError, urllib.error.HTTPError, urllib.error.URLError):
         utils.print_with_color(
             _("Warning: Unable to download UEFI:NTFS partition image from GitHub, installation skipped.  Target device might not be bootable if the UEFI firmware doesn't support NTFS filesystem."), "yellow")
         return 1
-
-    shutil.move(fileName, download_directory + "/" + fileName)  # move file to download_directory
 
     shutil.copy2(download_directory + "/uefi-ntfs.img", uefi_ntfs_partition)
 
@@ -492,20 +492,15 @@ def copy_large_file(source, target):
     :param target:
     :return: None
     """
-    source_file = open(source, "rb")  # Open for reading in byte mode
-    target_file = open(target, "wb")  # Open for writing in byte mode
+    with open(source, "rb") as source_file, open(target, "wb") as target_file:
+        while True:
+            utils.check_kill_signal()
 
-    while True:
-        utils.check_kill_signal()
+            data = source_file.read(5 * 1024 * 1024)
+            if data == b"":
+                break
 
-        data = source_file.read(5 * 1024 * 1024)  # Read 5 MiB, speeds of shitty pendrives can be as low as 2 MiB/s
-        if data == b"":
-            break
-
-        target_file.write(data)
-
-    source_file.close()
-    target_file.close()
+            target_file.write(data)
 
 
 def install_legacy_pc_bootloader_grub(target_fs_mountpoint, target_device, command_grubinstall):
@@ -657,13 +652,13 @@ class ReportCopyProgress(threading.Thread):
     """
     Classes for threading module
     """
-    file = ""
-    stop = False
 
     def __init__(self, source, target):
         threading.Thread.__init__(self)
         self.source = source
         self.target = target
+        self.file = ""
+        self.stop = False
 
     def run(self):
         source_size = utils.get_size(self.source)
@@ -706,7 +701,7 @@ class ReportCopyProgress(threading.Thread):
 
 def run():
     result = init()
-    if isinstance(result, list) is False:
+    if not isinstance(result, list):
         return
 
     source_fs_mountpoint, target_fs_mountpoint, temp_directory, \

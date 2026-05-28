@@ -2,10 +2,10 @@
 DOC: https://www.freedesktop.org/software/polkit/docs/latest/polkit.8.html
 --><policyconfig>
 	<vendor>The WoeUSB Project</vendor>
-	<vendor_url>https://github.com/slacka/WoeUSB</vendor_url>
+	<vendor_url>https://github.com/WoeUSB/WoeUSB-ng</vendor_url>
 	<icon_name>woeusbgui-icon</icon_name>
 
-	<action id="com.github.slacka.woeusb.run-gui-using-pkexec">
+	<action id="com.github.woeusb.woeusb-ng.run-gui-using-pkexec">
 		<description>Run `woeusb` as SuperUser</description>
 		<description xml:lang="zh_TW">以超級使用者(SuperUser)身份執行 `woeusb`</description>
 		<description xml:lang="pl_PL">Uruchom `woeusb` jako root</description>

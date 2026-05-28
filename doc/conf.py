@@ -24,9 +24,8 @@ copyright = '2018, congelli501, slacka and WaxyMocha et. al.'
 author = 'congelli501, slacka and WaxyMocha et. al.'
 
 # The short X.Y version
-version = ''
-# The full version, including alpha/beta/rc tags
-release = '1.0.0'
+version = '0.2'
+release = '0.2.12'
 
 
 # -- General configuration ---------------------------------------------------
@@ -164,5 +163,5 @@ texinfo_documents = [
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
 
-html_logo = "../src/data/woeusb-logo.png"
-html_favicon = "../src/data/icon.ico"
+html_logo = "../src/WoeUSB/data/woeusb-logo.png"
+html_favicon = "../src/WoeUSB/data/icon.ico"

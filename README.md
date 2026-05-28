@@ -83,10 +83,10 @@ Please note that this will not create menu shortcut and you may need to run gui 
 To remove WoeUSB-ng completely run (needed only when using installation from source code):
 ```shell
 sudo pip3 uninstall WoeUSB-ng
-sudo rm /usr/share/icons/WoeUSB-ng/icon.ico \
-    /usr/share/applications/WoeUSB-ng.desktop \
+sudo rm /usr/share/applications/WoeUSB-ng.desktop \
+    /usr/share/polkit-1/actions/com.github.woeusb.woeusb-ng.policy \
+    /usr/share/icons/hicolor/scalable/apps/woeusb-logo.png \
     /usr/local/bin/woeusbgui
-sudo rmdir /usr/share/icons/WoeUSB-ng/
 ```
 ### Debian note
 the debian system requires python policy for modifications with the system, but it can broke you programs

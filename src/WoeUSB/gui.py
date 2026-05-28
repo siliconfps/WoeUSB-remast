@@ -3,6 +3,7 @@
 import os
 import time
 import threading
+import subprocess
 
 import wx
 import wx.adv
@@ -11,10 +12,9 @@ import wx.adv
 import WoeUSB.core as core
 import WoeUSB.list_devices as list_devices
 import WoeUSB.miscellaneous as miscellaneous
+import WoeUSB.utils as utils
 
 data_directory = os.path.dirname(__file__) + "/data/"
-
-app = wx.App()
 
 _ = miscellaneous.i18n
 
@@ -91,12 +91,12 @@ class MainPanel(wx.Panel):
     __parent = None
 
     __dvdDriveList = None
-    __usbStickList = wx.ListBox
+    __usbStickList = None
 
     __dvdDriveDevList = []
     __usbStickDevList = []
 
-    __isoFile = wx.FilePickerCtrl
+    __isoFile = None
 
     __parentFrame = None
 
@@ -216,7 +216,7 @@ class MainPanel(wx.Panel):
                 not is_iso and self.__dvdDriveList.GetSelection() != wx.NOT_FOUND)) and self.__usbStickList.GetSelection() != wx.NOT_FOUND
 
     def on_list_or_file_modified(self, event):
-        if event.GetEventType() == wx.EVT_LISTBOX and not event.IsSelection():
+        if event.GetEventType() == wx.wxEVT_LISTBOX and not event.IsSelection():
             return
 
         self.__btInstall.Enable(self.is_install_ok())
@@ -225,7 +225,6 @@ class MainPanel(wx.Panel):
         self.refresh_list_content()
 
     def on_install(self, __):
-        global woe
         if wx.MessageBox(
             _("Are you sure? This will delete all your files and wipe out the selected partition."),
             _("Cancel"),
@@ -246,7 +245,7 @@ class MainPanel(wx.Panel):
                 filesystem = "NTFS"
             else:
                 filesystem = "FAT"
-		
+
             woe = WoeUSB_handler(iso, device, boot_flag=self.__parent.options_boot.IsChecked(), filesystem=filesystem, skip_grub=self.__parent.options_skip_grub.IsChecked())
             woe.start()
 
@@ -382,14 +381,14 @@ class WoeUSB_handler(threading.Thread):
     """
     Class for handling communication with woeusb.
     """
-    progress = False
-    state = ""
-    error = ""
-    kill = False
 
     def __init__(self, source, target, boot_flag, filesystem, skip_grub=False):
         threading.Thread.__init__(self)
 
+        self.progress = False
+        self.state = ""
+        self.error = ""
+        self.kill = False
         core.gui = self
         self.source = source
         self.target = target
@@ -406,14 +405,15 @@ class WoeUSB_handler(threading.Thread):
         )
         try:
             core.main(source_fs_mountpoint, target_fs_mountpoint, self.source, self.target, "device", temp_directory,
-                      self.filesystem, self.boot_flag , None, self.skip_grub)
-        except SystemExit:
+                      self.filesystem, self.boot_flag, None, self.skip_grub)
+        except (SystemExit, utils.WoeUSBError):
             pass
 
         core.cleanup(source_fs_mountpoint, target_fs_mountpoint, temp_directory, target_media)
 
 
 def run():
+    app = wx.App()
     frameTitle = "WoeUSB-ng"
 
     frame = MainFrame(frameTitle, wx.DefaultPosition, wx.Size(400, 600))
@@ -423,5 +423,16 @@ def run():
     app.MainLoop()
 
 
+def run_with_pkexec():
+    if os.getuid() != 0:
+        subprocess.run(["pkexec", os.path.realpath(__file__)])
+    else:
+        try:
+            run()
+        except SystemExit:
+            update_policy_to_allow_for_running_gui_as_root(__file__)
+            print("Policy was updated, please run this program again")
+
+
 if __name__ == "__main__":
-    run()
+    run_with_pkexec()
